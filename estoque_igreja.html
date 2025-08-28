@@ -4,11 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Controle de Estoque da Igreja</title>
-    
-    <!-- Firebase SDK -->
-    <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore-compat.js"></script>
-    
     <style>
         * {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -233,10 +228,10 @@
             color: #777;
         }
         
-        .loading {
-            text-align: center;
-            padding: 20px;
-            color: #666;
+        .empty-state img {
+            max-width: 150px;
+            opacity: 0.5;
+            margin-bottom: 15px;
         }
         
         @media (max-width: 768px) {
@@ -283,9 +278,6 @@
                         <!-- Itens serão inseridos aqui dinamicamente -->
                     </tbody>
                 </table>
-                <div id="loadingState" class="loading" style="display: none;">
-                    <p>Carregando dados...</p>
-                </div>
                 <div id="emptyState" class="empty-state" style="display: none;">
                     <p>Nenhum item cadastrado. Clique em "Adicionar Item" para começar.</p>
                 </div>
@@ -358,24 +350,6 @@
     <div id="notification" class="notification"></div>
     
     <script>
-        // Configuração do Firebase com suas credenciais
-        const firebaseConfig = {
-            apiKey: "AIzaSyA6j9T-w66lGHELq_1bUF-E3ZDQ-JIzzq8",
-            authDomain: "controleestoqueigreja.firebaseapp.com",
-            projectId: "controleestoqueigreja",
-            storageBucket: "controleestoqueigreja.firebasestorage.app",
-            messagingSenderId: "271906568513",
-            appId: "1:271906568513:web:0cb2421eb04233db3f09c0"
-        };
-
-        // Inicializar Firebase
-        firebase.initializeApp(firebaseConfig);
-        const db = firebase.firestore();
-        
-        // Referências para as coleções
-        const itemsCollection = db.collection('items');
-        const settingsCollection = db.collection('settings').doc('notificationSettings');
-
         document.addEventListener('DOMContentLoaded', function() {
             // Elementos do DOM
             const addItemBtn = document.getElementById('addItemBtn');
@@ -387,7 +361,6 @@
             const settingsForm = document.getElementById('settingsForm');
             const stockTableBody = document.getElementById('stockTableBody');
             const emptyState = document.getElementById('emptyState');
-            const loadingState = document.getElementById('loadingState');
             const notification = document.getElementById('notification');
             const modalTitle = document.getElementById('modalTitle');
             const cancelBtn = document.getElementById('cancelBtn');
@@ -395,16 +368,16 @@
             const closeButtons = document.querySelectorAll('.close');
             
             // Estado do aplicativo
-            let items = [];
-            let settings = {
+            let items = JSON.parse(localStorage.getItem('churchStockItems')) || [];
+            let settings = JSON.parse(localStorage.getItem('churchStockSettings')) || {
                 cultDays: [],
                 notificationTime: '10:00'
             };
             let editingItemId = null;
             
             // Inicialização
-            loadItems();
-            loadSettings();
+            renderItems();
+            setupSettingsForm();
             scheduleNotifications();
             
             // Event Listeners
@@ -474,86 +447,36 @@
                 if (name && !isNaN(quantity) && !isNaN(minStock)) {
                     if (editingItemId) {
                         // Editar item existente
-                        itemsCollection.doc(editingItemId).update({
-                            name,
-                            quantity,
-                            minStock,
-                            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-                        })
-                        .then(() => {
+                        const index = items.findIndex(item => item.id === editingItemId);
+                        if (index !== -1) {
+                            items[index] = { ...items[index], name, quantity, minStock };
                             showNotification('Item atualizado com sucesso!', 'success');
-                            closeItemModal();
-                        })
-                        .catch(error => {
-                            showNotification('Erro ao atualizar item: ' + error.message, 'error');
-                        });
+                        }
                     } else {
                         // Adicionar novo item
-                        itemsCollection.add({
+                        const newItem = {
+                            id: Date.now().toString(),
                             name,
                             quantity,
-                            minStock,
-                            createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                        })
-                        .then(() => {
-                            showNotification('Item adicionado com sucesso!', 'success');
-                            closeItemModal();
-                        })
-                        .catch(error => {
-                            showNotification('Erro ao adicionar item: ' + error.message, 'error');
-                        });
+                            minStock
+                        };
+                        items.push(newItem);
+                        showNotification('Item adicionado com sucesso!', 'success');
                     }
+                    
+                    localStorage.setItem('churchStockItems', JSON.stringify(items));
+                    renderItems();
+                    closeItemModal();
                 }
             }
             
             function deleteItem(id) {
                 if (confirm('Tem certeza que deseja excluir este item?')) {
-                    itemsCollection.doc(id).delete()
-                        .then(() => {
-                            showNotification('Item excluído com sucesso!', 'success');
-                        })
-                        .catch(error => {
-                            showNotification('Erro ao excluir item: ' + error.message, 'error');
-                        });
-                }
-            }
-            
-            function loadItems() {
-                loadingState.style.display = 'block';
-                emptyState.style.display = 'none';
-                
-                itemsCollection.orderBy('name').onSnapshot(snapshot => {
-                    items = [];
-                    snapshot.forEach(doc => {
-                        items.push({
-                            id: doc.id,
-                            ...doc.data()
-                        });
-                    });
-                    
+                    items = items.filter(item => item.id !== id);
+                    localStorage.setItem('churchStockItems', JSON.stringify(items));
                     renderItems();
-                    loadingState.style.display = 'none';
-                }, error => {
-                    showNotification('Erro ao carregar itens: ' + error.message, 'error');
-                    loadingState.style.display = 'none';
-                });
-            }
-            
-            function loadSettings() {
-                settingsCollection.get()
-                    .then(doc => {
-                        if (doc.exists) {
-                            settings = doc.data();
-                            setupSettingsForm();
-                        } else {
-                            // Configurações padrão se não existirem
-                            settingsCollection.set(settings);
-                            setupSettingsForm();
-                        }
-                    })
-                    .catch(error => {
-                        showNotification('Erro ao carregar configurações: ' + error.message, 'error');
-                    });
+                    showNotification('Item excluído com sucesso!', 'success');
+                }
             }
             
             function renderItems() {
@@ -629,21 +552,15 @@
                 const cultDays = Array.from(cultDaysCheckboxes).map(cb => cb.value);
                 const notificationTime = document.getElementById('notificationTime').value;
                 
-                const newSettings = {
+                settings = {
                     cultDays,
                     notificationTime
                 };
                 
-                settingsCollection.set(newSettings)
-                    .then(() => {
-                        settings = newSettings;
-                        showNotification('Configurações salvas com sucesso!', 'success');
-                        closeSettingsModal();
-                        scheduleNotifications();
-                    })
-                    .catch(error => {
-                        showNotification('Erro ao salvar configurações: ' + error.message, 'error');
-                    });
+                localStorage.setItem('churchStockSettings', JSON.stringify(settings));
+                showNotification('Configurações salvas com sucesso!', 'success');
+                closeSettingsModal();
+                scheduleNotifications();
             }
             
             function scheduleNotifications() {
