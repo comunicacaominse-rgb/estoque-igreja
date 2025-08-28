@@ -1,0 +1,694 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Controle de Estoque da Igreja</title>
+    
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore-compat.js"></script>
+    
+    <style>
+        * {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        
+        body {
+            background-color: #f5f7fa;
+            color: #333;
+            line-height: 1.6;
+        }
+        
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        header {
+            background-color: #2c3e50;
+            color: white;
+            padding: 20px;
+            text-align: center;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        
+        h1 {
+            font-size: 2rem;
+            margin-bottom: 5px;
+        }
+        
+        .subtitle {
+            font-size: 1rem;
+            opacity: 0.8;
+        }
+        
+        .actions {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        
+        .btn {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: background-color 0.3s;
+        }
+        
+        .btn:hover {
+            background-color: #2980b9;
+        }
+        
+        .btn-danger {
+            background-color: #e74c3c;
+        }
+        
+        .btn-danger:hover {
+            background-color: #c0392b;
+        }
+        
+        .btn-success {
+            background-color: #2ecc71;
+        }
+        
+        .btn-success:hover {
+            background-color: #27ae60;
+        }
+        
+        .card {
+            background-color: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        
+        .table-container {
+            overflow-x: auto;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        th, td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        
+        th {
+            background-color: #f2f2f2;
+            font-weight: 600;
+        }
+        
+        tr:hover {
+            background-color: #f9f9f9;
+        }
+        
+        .status {
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: bold;
+        }
+        
+        .status-ok {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        
+        .status-low {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .modal-content {
+            background-color: white;
+            padding: 25px;
+            border-radius: 8px;
+            width: 90%;
+            max-width: 500px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+        
+        .close {
+            float: right;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: #aaa;
+        }
+        
+        .close:hover {
+            color: #333;
+        }
+        
+        .form-group {
+            margin-bottom: 15px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+        }
+        
+        input, select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 1rem;
+        }
+        
+        .checkbox-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin-top: 10px;
+        }
+        
+        .checkbox-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background-color: #3498db;
+            color: white;
+            padding: 15px 20px;
+            border-radius: 5px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            z-index: 2000;
+            display: none;
+            max-width: 300px;
+        }
+        
+        .notification.success {
+            background-color: #2ecc71;
+        }
+        
+        .notification.warning {
+            background-color: #f39c12;
+        }
+        
+        .notification.error {
+            background-color: #e74c3c;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 30px;
+            color: #777;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+        }
+        
+        @media (max-width: 768px) {
+            .actions {
+                flex-direction: column;
+            }
+            
+            .btn {
+                width: 100%;
+            }
+            
+            th, td {
+                padding: 8px 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Controle de Estoque da Igreja</h1>
+            <p class="subtitle">Gerencie os itens da igreja de forma simples e eficiente</p>
+        </header>
+        
+        <div class="actions">
+            <button class="btn" id="addItemBtn">Adicionar Item</button>
+            <button class="btn" id="settingsBtn">Configurar Notificações</button>
+            <button class="btn btn-success" id="checkStockBtn">Verificar Estoque</button>
+        </div>
+        
+        <div class="card">
+            <div class="table-container">
+                <table id="stockTable">
+                    <thead>
+                        <tr>
+                            <th>Item</th>
+                            <th>Quantidade</th>
+                            <th>Estoque Mínimo</th>
+                            <th>Status</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="stockTableBody">
+                        <!-- Itens serão inseridos aqui dinamicamente -->
+                    </tbody>
+                </table>
+                <div id="loadingState" class="loading" style="display: none;">
+                    <p>Carregando dados...</p>
+                </div>
+                <div id="emptyState" class="empty-state" style="display: none;">
+                    <p>Nenhum item cadastrado. Clique em "Adicionar Item" para começar.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Modal Adicionar/Editar Item -->
+    <div id="itemModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2 id="modalTitle">Adicionar Novo Item</h2>
+            <form id="itemForm">
+                <div class="form-group">
+                    <label for="itemName">Nome do Item</label>
+                    <input type="text" id="itemName" required>
+                </div>
+                <div class="form-group">
+                    <label for="itemQuantity">Quantidade</label>
+                    <input type="number" id="itemQuantity" min="0" required>
+                </div>
+                <div class="form-group">
+                    <label for="itemMinStock">Estoque Mínimo</label>
+                    <input type="number" id="itemMinStock" min="0" required>
+                </div>
+                <div class="form-group">
+                    <button type="submit" class="btn btn-success">Salvar</button>
+                    <button type="button" class="btn" id="cancelBtn">Cancelar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Modal Configurações -->
+    <div id="settingsModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>Configurar Notificações</h2>
+            <form id="settingsForm">
+                <div class="form-group">
+                    <label>Dias de Culto</label>
+                    <div class="checkbox-group">
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="sunday" name="cultDay" value="Domingo">
+                            <label for="sunday">Domingo</label>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="wednesday" name="cultDay" value="Quarta">
+                            <label for="wednesday">Quarta</label>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="saturday" name="cultDay" value="Sábado">
+                            <label for="saturday">Sábado</label>
+                        </div>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="notificationTime">Horário da Notificação</label>
+                    <input type="time" id="notificationTime" required>
+                </div>
+                <div class="form-group">
+                    <button type="submit" class="btn btn-success">Salvar Configurações</button>
+                    <button type="button" class="btn" id="cancelSettingsBtn">Cancelar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Notificação -->
+    <div id="notification" class="notification"></div>
+    
+    <script>
+        // Configuração do Firebase com suas credenciais
+        const firebaseConfig = {
+            apiKey: "AIzaSyA6j9T-w66lGHELq_1bUF-E3ZDQ-JIzzq8",
+            authDomain: "controleestoqueigreja.firebaseapp.com",
+            projectId: "controleestoqueigreja",
+            storageBucket: "controleestoqueigreja.firebasestorage.app",
+            messagingSenderId: "271906568513",
+            appId: "1:271906568513:web:0cb2421eb04233db3f09c0"
+        };
+
+        // Inicializar Firebase
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+        
+        // Referências para as coleções
+        const itemsCollection = db.collection('items');
+        const settingsCollection = db.collection('settings').doc('notificationSettings');
+
+        document.addEventListener('DOMContentLoaded', function() {
+            // Elementos do DOM
+            const addItemBtn = document.getElementById('addItemBtn');
+            const settingsBtn = document.getElementById('settingsBtn');
+            const checkStockBtn = document.getElementById('checkStockBtn');
+            const itemModal = document.getElementById('itemModal');
+            const settingsModal = document.getElementById('settingsModal');
+            const itemForm = document.getElementById('itemForm');
+            const settingsForm = document.getElementById('settingsForm');
+            const stockTableBody = document.getElementById('stockTableBody');
+            const emptyState = document.getElementById('emptyState');
+            const loadingState = document.getElementById('loadingState');
+            const notification = document.getElementById('notification');
+            const modalTitle = document.getElementById('modalTitle');
+            const cancelBtn = document.getElementById('cancelBtn');
+            const cancelSettingsBtn = document.getElementById('cancelSettingsBtn');
+            const closeButtons = document.querySelectorAll('.close');
+            
+            // Estado do aplicativo
+            let items = [];
+            let settings = {
+                cultDays: [],
+                notificationTime: '10:00'
+            };
+            let editingItemId = null;
+            
+            // Inicialização
+            loadItems();
+            loadSettings();
+            scheduleNotifications();
+            
+            // Event Listeners
+            addItemBtn.addEventListener('click', openAddItemModal);
+            settingsBtn.addEventListener('click', openSettingsModal);
+            checkStockBtn.addEventListener('click', checkStockLevels);
+            itemForm.addEventListener('submit', saveItem);
+            settingsForm.addEventListener('submit', saveSettings);
+            cancelBtn.addEventListener('click', closeItemModal);
+            cancelSettingsBtn.addEventListener('click', closeSettingsModal);
+            
+            closeButtons.forEach(button => {
+                button.addEventListener('click', function() {
+                    itemModal.style.display = 'none';
+                    settingsModal.style.display = 'none';
+                });
+            });
+            
+            window.addEventListener('click', function(event) {
+                if (event.target === itemModal) {
+                    itemModal.style.display = 'none';
+                }
+                if (event.target === settingsModal) {
+                    settingsModal.style.display = 'none';
+                }
+            });
+            
+            // Funções
+            function openAddItemModal() {
+                modalTitle.textContent = 'Adicionar Novo Item';
+                itemForm.reset();
+                editingItemId = null;
+                itemModal.style.display = 'flex';
+            }
+            
+            function openEditItemModal(id) {
+                const item = items.find(item => item.id === id);
+                if (item) {
+                    modalTitle.textContent = 'Editar Item';
+                    document.getElementById('itemName').value = item.name;
+                    document.getElementById('itemQuantity').value = item.quantity;
+                    document.getElementById('itemMinStock').value = item.minStock;
+                    editingItemId = id;
+                    itemModal.style.display = 'flex';
+                }
+            }
+            
+            function openSettingsModal() {
+                settingsModal.style.display = 'flex';
+            }
+            
+            function closeItemModal() {
+                itemModal.style.display = 'none';
+            }
+            
+            function closeSettingsModal() {
+                settingsModal.style.display = 'none';
+            }
+            
+            function saveItem(e) {
+                e.preventDefault();
+                
+                const name = document.getElementById('itemName').value.trim();
+                const quantity = parseInt(document.getElementById('itemQuantity').value);
+                const minStock = parseInt(document.getElementById('itemMinStock').value);
+                
+                if (name && !isNaN(quantity) && !isNaN(minStock)) {
+                    if (editingItemId) {
+                        // Editar item existente
+                        itemsCollection.doc(editingItemId).update({
+                            name,
+                            quantity,
+                            minStock,
+                            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                        })
+                        .then(() => {
+                            showNotification('Item atualizado com sucesso!', 'success');
+                            closeItemModal();
+                        })
+                        .catch(error => {
+                            showNotification('Erro ao atualizar item: ' + error.message, 'error');
+                        });
+                    } else {
+                        // Adicionar novo item
+                        itemsCollection.add({
+                            name,
+                            quantity,
+                            minStock,
+                            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                        })
+                        .then(() => {
+                            showNotification('Item adicionado com sucesso!', 'success');
+                            closeItemModal();
+                        })
+                        .catch(error => {
+                            showNotification('Erro ao adicionar item: ' + error.message, 'error');
+                        });
+                    }
+                }
+            }
+            
+            function deleteItem(id) {
+                if (confirm('Tem certeza que deseja excluir este item?')) {
+                    itemsCollection.doc(id).delete()
+                        .then(() => {
+                            showNotification('Item excluído com sucesso!', 'success');
+                        })
+                        .catch(error => {
+                            showNotification('Erro ao excluir item: ' + error.message, 'error');
+                        });
+                }
+            }
+            
+            function loadItems() {
+                loadingState.style.display = 'block';
+                emptyState.style.display = 'none';
+                
+                itemsCollection.orderBy('name').onSnapshot(snapshot => {
+                    items = [];
+                    snapshot.forEach(doc => {
+                        items.push({
+                            id: doc.id,
+                            ...doc.data()
+                        });
+                    });
+                    
+                    renderItems();
+                    loadingState.style.display = 'none';
+                }, error => {
+                    showNotification('Erro ao carregar itens: ' + error.message, 'error');
+                    loadingState.style.display = 'none';
+                });
+            }
+            
+            function loadSettings() {
+                settingsCollection.get()
+                    .then(doc => {
+                        if (doc.exists) {
+                            settings = doc.data();
+                            setupSettingsForm();
+                        } else {
+                            // Configurações padrão se não existirem
+                            settingsCollection.set(settings);
+                            setupSettingsForm();
+                        }
+                    })
+                    .catch(error => {
+                        showNotification('Erro ao carregar configurações: ' + error.message, 'error');
+                    });
+            }
+            
+            function renderItems() {
+                stockTableBody.innerHTML = '';
+                
+                if (items.length === 0) {
+                    emptyState.style.display = 'block';
+                    return;
+                }
+                
+                emptyState.style.display = 'none';
+                
+                items.forEach(item => {
+                    const row = document.createElement('tr');
+                    
+                    // Determinar status
+                    const statusClass = item.quantity <= item.minStock ? 'status-low' : 'status-ok';
+                    const statusText = item.quantity <= item.minStock ? 'Estoque Baixo' : 'OK';
+                    
+                    row.innerHTML = `
+                        <td>${item.name}</td>
+                        <td>${item.quantity}</td>
+                        <td>${item.minStock}</td>
+                        <td><span class="status ${statusClass}">${statusText}</span></td>
+                        <td>
+                            <button class="btn" onclick="openEditItemModal('${item.id}')">Editar</button>
+                            <button class="btn btn-danger" onclick="deleteItem('${item.id}')">Excluir</button>
+                        </td>
+                    `;
+                    
+                    stockTableBody.appendChild(row);
+                });
+            }
+            
+            function checkStockLevels() {
+                const lowStockItems = items.filter(item => item.quantity <= item.minStock);
+                
+                if (lowStockItems.length > 0) {
+                    const itemsList = lowStockItems.map(item => `${item.name} (${item.quantity})`).join(', ');
+                    showNotification(`Atenção! Itens com estoque baixo: ${itemsList}`, 'warning');
+                    
+                    // Solicitar permissão para notificações do navegador
+                    if ('Notification' in window && Notification.permission === 'default') {
+                        Notification.requestPermission();
+                    }
+                    
+                    // Enviar notificação do navegador se permitido
+                    if ('Notification' in window && Notification.permission === 'granted') {
+                        new Notification('Estoque Baixo', {
+                            body: `Os seguintes itens precisam de reposição: ${itemsList}`,
+                            icon: 'https://picsum.photos/seed/church/64/64.jpg'
+                        });
+                    }
+                } else {
+                    showNotification('Todos os itens estão com estoque adequado!', 'success');
+                }
+            }
+            
+            function setupSettingsForm() {
+                // Preencher formulário com configurações salvas
+                const cultDaysCheckboxes = document.querySelectorAll('input[name="cultDay"]');
+                cultDaysCheckboxes.forEach(checkbox => {
+                    checkbox.checked = settings.cultDays.includes(checkbox.value);
+                });
+                
+                document.getElementById('notificationTime').value = settings.notificationTime;
+            }
+            
+            function saveSettings(e) {
+                e.preventDefault();
+                
+                const cultDaysCheckboxes = document.querySelectorAll('input[name="cultDay"]:checked');
+                const cultDays = Array.from(cultDaysCheckboxes).map(cb => cb.value);
+                const notificationTime = document.getElementById('notificationTime').value;
+                
+                const newSettings = {
+                    cultDays,
+                    notificationTime
+                };
+                
+                settingsCollection.set(newSettings)
+                    .then(() => {
+                        settings = newSettings;
+                        showNotification('Configurações salvas com sucesso!', 'success');
+                        closeSettingsModal();
+                        scheduleNotifications();
+                    })
+                    .catch(error => {
+                        showNotification('Erro ao salvar configurações: ' + error.message, 'error');
+                    });
+            }
+            
+            function scheduleNotifications() {
+                // Limpar notificações agendadas anteriores
+                if (window.notificationInterval) {
+                    clearInterval(window.notificationInterval);
+                }
+                
+                // Agendar novas notificações
+                if (settings.cultDays.length > 0) {
+                    window.notificationInterval = setInterval(() => {
+                        const now = new Date();
+                        const currentDay = now.toLocaleDateString('pt-BR', { weekday: 'long' });
+                        const currentTime = now.toTimeString().slice(0, 5);
+                        
+                        if (settings.cultDays.includes(currentDay) && currentTime === settings.notificationTime) {
+                            showNotification(`Hoje é dia de culto! Verifique o estoque antes do culto.`, 'warning');
+                            
+                            // Enviar notificação do navegador se permitido
+                            if ('Notification' in window && Notification.permission === 'granted') {
+                                new Notification('Lembrete de Culto', {
+                                    body: 'Verifique o estoque antes do culto de hoje.',
+                                    icon: 'https://picsum.photos/seed/church/64/64.jpg'
+                                });
+                            }
+                        }
+                    }, 60000); // Verificar a cada minuto
+                }
+            }
+            
+            function showNotification(message, type = 'info') {
+                notification.textContent = message;
+                notification.className = 'notification';
+                notification.classList.add(type);
+                notification.style.display = 'block';
+                
+                setTimeout(() => {
+                    notification.style.display = 'none';
+                }, 5000);
+            }
+            
+            // Funções globais para acesso nos atributos onclick
+            window.openEditItemModal = openEditItemModal;
+            window.deleteItem = deleteItem;
+        });
+    </script>
+</body>
+</html>
